@@ -7,6 +7,7 @@ import traceback
 from typing import List, Dict, Tuple, Optional, Any
 from enum import Enum
 import timeout_decorator
+from instrument_test_code import instrument_test_code
 
 
 class ErrorType(Enum):
@@ -78,7 +79,7 @@ def execute_code_with_test(code: str, test_input: Any, expected_output: Any) -> 
         return ErrorType.RUNTIME_ERROR, None
 
 
-def calculate_test_pass_rate(code: str, test_cases: List[Dict]) -> Tuple[float, Dict[str, int]]:
+def calculate_test_pass_rate(code: str, test_code: str) -> Tuple[float, Dict[str, int]]:
     """
     Calculate pass rate on ground truth test cases.
     
@@ -87,27 +88,56 @@ def calculate_test_pass_rate(code: str, test_cases: List[Dict]) -> Tuple[float, 
         test_cases: List of dicts with 'input' and 'output' keys
     
     Returns:
-        (pass_rate, error_counts): 
+        (pass_rate, error_counts):
             - pass_rate: fraction of tests passed (0.0 to 1.0)
             - error_counts: dict mapping ErrorType to count
     """
-    if not test_cases:
-        return 0.0, {}
-    
-    passed = 0
-    error_counts = {error_type: 0 for error_type in ErrorType}
-    
-    for test in test_cases:
-        test_input = test.get('input')
-        expected_output = test.get('output')
-        
-        error_type, actual_output = execute_code_with_test(code, test_input, expected_output)
-        error_counts[error_type] += 1
-        
-        if error_type == ErrorType.SUCCESS:
-            passed += 1
-    
-    pass_rate = passed / len(test_cases)
+
+    # 1. Prepare execution environment for candidate code
+    candidate_env = {}
+    try:
+        exec(code, candidate_env)
+    except Exception as e:
+        # Candidate code failed to compile or execute
+        return 0.0, {
+            ErrorType.RUNTIME_ERROR: 1 
+        }
+
+    # Candidate solution must define the expected entry point
+    candidate = None
+    for v in candidate_env.values():
+        if callable(v):
+            candidate = v
+    if candidate is None:
+        return 0.0, {
+            ErrorType.RUNTIME_ERROR: 1 
+        }
+
+    # 2. Instrument the HumanEval test code
+    env, results = instrument_test_code(test_code)
+
+    # 3. Run the instrumented check(candidate)
+    try:
+        check_fn = env["check"]
+        check_fn(candidate)
+    except Exception as e:
+        # Unexpected crash during tests, not an assertion failure
+        # The assertion transformer catches normal assertion failures.
+        return 0.0, {
+            ErrorType.RUNTIME_ERROR: 1, 
+            ErrorType.SUCCESS: results["passed"],
+            ErrorType.WRONG_OUTPUT: results["failed"]
+        }
+
+    # 4. Compute pass rate
+    total_asserts = results["passed"] + results["failed"]
+    pass_rate = (results["passed"] / total_asserts) if total_asserts > 0 else 0.0
+
+    error_counts = {
+        ErrorType.SUCCESS: results["passed"],
+        ErrorType.WRONG_OUTPUT: results["failed"]
+    }
+
     return pass_rate, error_counts
 
 

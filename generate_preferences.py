@@ -4,12 +4,13 @@ import json
 from typing import List, Dict, Tuple
 from tqdm import tqdm
 from utils import calculate_test_pass_rate, ErrorType
-
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from datasets import load_dataset
 
 class PreferenceGenerator:
     """Generates DPO preference tuples using ground truth test pass rates."""
     
-    def __init__(self, base_model: str = "meta-llama/CodeLlama-7b-hf"):
+    def __init__(self, base_model: str = "codellama/CodeLlama-7b-Instruct-hf"):
         self.base_model = base_model
     
     def generate_response_with_llama(self, prompt: str, temperature: float = 0.8) -> str:
@@ -40,9 +41,13 @@ class PreferenceGenerator:
                                    input={"prompt": prompt})
             return output
         """
-        raise NotImplementedError(
-            "Implement Llama inference here. See docstring for options."
-        )
+        
+        model = AutoModelForCausalLM.from_pretrained(self.base_model)
+        tokenizer = AutoTokenizer.from_pretrained(self.base_model)
+        inputs = tokenizer(prompt, return_tensors="pt")
+        outputs = model.generate(**inputs, max_length=1024, temperature=temperature)
+        return tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
     
     def generate_preference_data_for_problem(
         self,
@@ -83,7 +88,6 @@ class PreferenceGenerator:
         
         print(f"\n{'='*60}")
         print(f"Processing problem: {problem_id}")
-        print(f"Test cases: {len(test_cases)}")
         print(f"{'='*60}")
         
         # Step 1: Generate n responses from base model
@@ -105,6 +109,7 @@ class PreferenceGenerator:
         
         for idx, response_code in enumerate(responses):
             print(f"\n  Response {idx+1}/{len(responses)}:")
+            print(response_code)
             
             # Calculate test pass rate
             pass_rate, error_counts = calculate_test_pass_rate(response_code, test_cases)
@@ -215,37 +220,32 @@ class PreferenceGenerator:
 
 def load_humaneval(file_path: str = "humaneval.jsonl") -> List[Dict]:
     """
-    Load HumanEval dataset.
-    
-    Expected format (one problem per line):
-    {
-        "task_id": "HumanEval/0",
-        "prompt": "...",
-        "test": "check(candidate)",  # Full test code
-        "entry_point": "function_name"
-    }
-    
-    Returns list of problems in our format with parsed test cases.
+    Load HumanEval dataset from HuggingFace.
+
+    Dataset: openai/human-eval
+    Each record has:
+        - task_id
+        - prompt
+        - entry_point
+        - test        (full test code)
+        - canonical_solution
+
+    Returns a list of problems in the same format as the original loader.
     """
+    ds = load_dataset("openai_humaneval")["test"]
+
     problems = []
-    
-    with open(file_path, 'r') as f:
-        for line in f:
-            item = json.loads(line)
-            
-            # Parse test cases from HumanEval format
-            # Note: HumanEval tests are executable code, need to extract assertions
-            # For simplicity, we'll store the full test code and execute it
-            
-            problems.append({
-                'problem_id': item['task_id'],
-                'prompt': item['prompt'],
-                'test_code': item.get('test', ''),
-                'entry_point': item.get('entry_point', ''),
-                'canonical_solution': item.get('canonical_solution', ''),
-                'test_cases': []  # Will be populated by executing test code
-            })
-    
+
+    for item in ds:
+        problems.append({
+            "problem_id": item["task_id"],
+            "prompt": item["prompt"],
+            "test_code": item.get("test", ""),
+            "entry_point": item.get("entry_point", ""),
+            "canonical_solution": item.get("canonical_solution", ""),
+            "test_cases": item.get("test", "")
+        })
+
     return problems
 
 
