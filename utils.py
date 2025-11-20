@@ -8,6 +8,7 @@ from typing import List, Dict, Tuple, Optional, Any
 from enum import Enum
 import timeout_decorator
 from instrument_test_code import instrument_test_code
+from datasets import load_dataset
 
 
 class ErrorType(Enum):
@@ -78,7 +79,7 @@ def execute_code_with_test(code: str, test_input: Any, expected_output: Any) -> 
         sys.stdout = old_stdout
         return ErrorType.RUNTIME_ERROR, None
 
-
+@timeout_decorator.timeout(5)
 def calculate_test_pass_rate(code: str, test_code: str) -> Tuple[float, Dict[str, int]]:
     """
     Calculate pass rate on ground truth test cases.
@@ -97,6 +98,10 @@ def calculate_test_pass_rate(code: str, test_code: str) -> Tuple[float, Dict[str
     candidate_env = {}
     try:
         exec(code, candidate_env)
+    except timeout_decorator.TimeoutError:
+        return 0.0, {
+            ErrorType.TIMEOUT: 1
+        }
     except Exception as e:
         # Candidate code failed to compile or execute
         return 0.0, {
@@ -174,3 +179,33 @@ def get_error_summary(error_counts: Dict[ErrorType, int]) -> Dict[str, Any]:
         'wrong_outputs': error_counts.get(ErrorType.WRONG_OUTPUT, 0),
         'compile_rate': 1.0 - (error_counts.get(ErrorType.SYNTAX_ERROR, 0) / total) if total > 0 else 0.0
     }
+
+def load_humaneval(file_path: str = "humaneval.jsonl") -> List[Dict]:
+    """
+    Load HumanEval dataset from HuggingFace.
+
+    Dataset: openai/human-eval
+    Each record has:
+        - task_id
+        - prompt
+        - entry_point
+        - test        (full test code)
+        - canonical_solution
+
+    Returns a list of problems in the same format as the original loader.
+    """
+    ds = load_dataset("openai_humaneval")["test"]
+
+    problems = []
+
+    for item in ds:
+        problems.append({
+            "problem_id": item["task_id"],
+            "prompt": item["prompt"],
+            "test_code": item.get("test", ""),
+            "entry_point": item.get("entry_point", ""),
+            "canonical_solution": item.get("canonical_solution", ""),
+            "test_cases": item.get("test", "")
+        })
+
+    return problems

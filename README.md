@@ -5,6 +5,7 @@ Implementation of Direct Preference Optimization (DPO) using **ground truth test
 ## Approach
 
 Uses **test-based truthfulness scoring** where:
+
 1. Generate multiple responses from base model
 2. Score each response by **test pass rate** on ground truth tests
 3. Create preference pairs: higher pass rate = chosen, lower = rejected
@@ -51,7 +52,7 @@ python train_dpo.py --dataset dpo_preferences.json --output ./dpo_model --epochs
 python evaluate.py --model ./dpo_model --benchmark humaneval --samples 10
 
 # Compare baseline vs fine-tuned
-python evaluate.py --model ./dpo_model --baseline codellama/CodeLlama-7b-hf --benchmark humaneval
+python evaluate.py --model ./dpo_model --baseline codellama/CodeLlama-7b-Instruct-hf --benchmark humaneval
 ```
 
 ## Key Features

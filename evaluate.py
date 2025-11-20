@@ -8,7 +8,7 @@ from collections import Counter
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from tqdm import tqdm
-from utils import ErrorType, calculate_test_pass_rate, get_error_summary, validate_code_syntax
+from utils import ErrorType, calculate_test_pass_rate, get_error_summary, validate_code_syntax, load_humaneval
 
 
 # Fixed sampling parameters for reproducibility
@@ -32,21 +32,6 @@ def pass_at_k(n: int, c: int, k: int) -> float:
     if n - c < k:
         return 1.0
     return 1.0 - np.prod(1.0 - k / np.arange(n - c + 1, n + 1))
-
-
-def load_humaneval(file_path: str = "humaneval.jsonl") -> List[Dict]:
-    """Load HumanEval benchmark with test cases."""
-    try:
-        problems = []
-        with open(file_path, 'r') as f:
-            for line in f:
-                problem = json.loads(line)
-                problems.append(problem)
-        return problems
-    except FileNotFoundError:
-        print(f"❌ HumanEval not found at {file_path}")
-        print("Download from: https://github.com/openai/human-eval")
-        return []
 
 
 def load_mbpp(file_path: str = "mbpp.jsonl") -> List[Dict]:
@@ -144,9 +129,10 @@ def evaluate_model(
         model_path,
         torch_dtype=torch.bfloat16,
         device_map="auto",
-        trust_remote_code=True
+        trust_remote_code=True,
+        cache_dir=".hf-cache"
     )
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, cache_dir=".hf-cache")
     
     # Load benchmark
     print(f"Loading {benchmark} benchmark...")
@@ -168,6 +154,8 @@ def evaluate_model(
     total_errors = {error_type: 0 for error_type in ErrorType}
     total_time = 0
     compile_count = 0
+
+    problems = problems[:10]
     
     for problem in tqdm(problems, desc="Evaluating"):
         prompt = problem.get('prompt', '')

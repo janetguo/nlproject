@@ -9,7 +9,7 @@ from transformers import (
     AutoTokenizer,
     TrainingArguments
 )
-from trl import DPOTrainer
+from trl import DPOTrainer, DPOConfig
 from datasets import Dataset
 from typing import Dict, List
 
@@ -50,7 +50,7 @@ def load_dpo_dataset(json_path: str) -> Dataset:
 
 
 def train_dpo_model(
-    model_name: str = "codellama/CodeLlama-7b-hf",
+    model_name: str = "codellama/CodeLlama-7b-Instruct-hf",
     train_dataset_path: str = "dpo_preferences.json",
     output_dir: str = "./dpo_model",
     learning_rate: float = 5e-7,
@@ -105,10 +105,11 @@ def train_dpo_model(
         model_name,
         torch_dtype=torch.bfloat16,
         device_map="auto",
-        trust_remote_code=True
+        trust_remote_code=True,
+        cache_dir=".hf-cache"
     )
     
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=".hf-cache")
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"  # Important for DPO
     
@@ -123,11 +124,12 @@ def train_dpo_model(
         model_name,
         torch_dtype=torch.bfloat16,
         device_map="auto",
-        trust_remote_code=True
+        trust_remote_code=True,
+        cache_dir=".hf-cache"
     )
     
     # Training arguments
-    training_args = TrainingArguments(
+    training_args = DPOConfig(
         output_dir=output_dir,
         num_train_epochs=num_epochs,
         per_device_train_batch_size=batch_size,
@@ -141,7 +143,10 @@ def train_dpo_model(
         run_name="dpo_code_hallucination",
         seed=seed,
         data_seed=seed,
-        report_to="none"  # Disable wandb/tensorboard by default
+        report_to="none",  # Disable wandb/tensorboard by default
+        beta=beta,
+        max_length=max_length,
+        max_prompt_length=512,
     )
     
     # Initialize DPO trainer
@@ -151,10 +156,7 @@ def train_dpo_model(
         ref_model=ref_model,
         args=training_args,
         train_dataset=train_dataset,
-        tokenizer=tokenizer,
-        beta=beta,
-        max_length=max_length,
-        max_prompt_length=512,
+        processing_class=tokenizer,
     )
     
     # Train
@@ -190,7 +192,7 @@ def train_dpo_model(
 
 
 def train_with_lora(
-    model_name: str = "codellama/CodeLlama-7b-hf",
+    model_name: str = "codellama/CodeLlama-7b-Instruct-hf",
     train_dataset_path: str = "dpo_preferences.json",
     output_dir: str = "./dpo_model_lora",
     learning_rate: float = 1e-4,
@@ -242,10 +244,11 @@ def train_with_lora(
         model_name,
         torch_dtype=torch.bfloat16,
         device_map="auto",
-        trust_remote_code=True
+        trust_remote_code=True,
+        cache_dir=".hf-cache"
     )
     
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, cache_dir=".hf-cache")
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
     
@@ -272,11 +275,12 @@ def train_with_lora(
         model_name,
         torch_dtype=torch.bfloat16,
         device_map="auto",
-        trust_remote_code=True
+        trust_remote_code=True,
+        cache_dir=".hf-cache"
     )
     
     # Training arguments
-    training_args = TrainingArguments(
+    training_args = DPOConfig(
         output_dir=output_dir,
         num_train_epochs=num_epochs,
         per_device_train_batch_size=batch_size,
@@ -290,7 +294,10 @@ def train_with_lora(
         run_name="dpo_code_hallucination_lora",
         seed=seed,
         data_seed=seed,
-        report_to="none"
+        report_to="none",
+        beta=beta,
+        max_length=max_length,
+        max_prompt_length=512,
     )
     
     # DPO trainer
@@ -299,10 +306,7 @@ def train_with_lora(
         ref_model=ref_model,
         args=training_args,
         train_dataset=train_dataset,
-        tokenizer=tokenizer,
-        beta=beta,
-        max_length=max_length,
-        max_prompt_length=512,
+        processing_class=tokenizer,
     )
     
     print("\nStarting training...")
@@ -345,7 +349,7 @@ if __name__ == "__main__":
                         help="Path to preference dataset")
     parser.add_argument("--output", type=str, default="./dpo_model",
                         help="Output directory for model")
-    parser.add_argument("--model", type=str, default="codellama/CodeLlama-7b-hf",
+    parser.add_argument("--model", type=str, default="codellama/CodeLlama-7b-Instruct-hf",
                         help="Base model name")
     parser.add_argument("--lora", action="store_true",
                         help="Use LoRA for memory-efficient training")

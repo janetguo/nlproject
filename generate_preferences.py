@@ -280,7 +280,7 @@ def load_mbpp(file_path: str = "mbpp.jsonl") -> List[Dict]:
 
 def split_dataset(
     problems: List[Dict],
-    train_ratio: float = 0.5,
+    train_ratio: float = 0.05,
     val_ratio: float = 0.2,
     test_ratio: float = 0.3,
     seed: int = 42
