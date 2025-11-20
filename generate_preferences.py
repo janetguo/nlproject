@@ -6,12 +6,15 @@ from tqdm import tqdm
 from utils import calculate_test_pass_rate, ErrorType
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
+import torch
 
 class PreferenceGenerator:
     """Generates DPO preference tuples using ground truth test pass rates."""
     
     def __init__(self, base_model: str = "codellama/CodeLlama-7b-Instruct-hf"):
         self.base_model = base_model
+        self.model = AutoModelForCausalLM.from_pretrained(self.base_model, cache_dir=".hf-cache/", torch_dtype=torch.float16, device_map="auto")
+        self.tokenizer = AutoTokenizer.from_pretrained(self.base_model, cache_dir=".hf-cache/")
     
     def generate_response_with_llama(self, prompt: str, temperature: float = 0.8) -> str:
         """
@@ -41,12 +44,9 @@ class PreferenceGenerator:
                                    input={"prompt": prompt})
             return output
         """
-        
-        model = AutoModelForCausalLM.from_pretrained(self.base_model)
-        tokenizer = AutoTokenizer.from_pretrained(self.base_model)
-        inputs = tokenizer(prompt, return_tensors="pt")
-        outputs = model.generate(**inputs, max_length=1024, temperature=temperature)
-        return tokenizer.decode(outputs[0], skip_special_tokens=True)
+        inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
+        outputs = self.model.generate(**inputs, max_length=1024, temperature=temperature, do_sample=True)
+        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         
     
     def generate_preference_data_for_problem(
