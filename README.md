@@ -32,7 +32,7 @@ You need to add Llama inference to `generate_preferences.py` (line 24). See READ
 python generate_preferences.py --dataset dummy --output dpo_preferences.json
 
 # Use HumanEval
-python generate_preferences.py --dataset humaneval --dataset-path humaneval.jsonl --output dpo_preferences.json
+python generate_preferences.py --dataset humaneval --output dpo_preferences.json
 ```
 
 ### 4. Train

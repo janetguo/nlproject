@@ -8,7 +8,7 @@ from collections import Counter
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from tqdm import tqdm
-from utils import ErrorType, calculate_test_pass_rate, get_error_summary, validate_code_syntax, load_humaneval
+from utils import split_dataset, ErrorType, calculate_test_pass_rate, get_error_summary, validate_code_syntax, load_humaneval
 
 
 # Fixed sampling parameters for reproducibility
@@ -153,9 +153,10 @@ def evaluate_model(
     total_time = 0
     compile_count = 0
 
-    problems = problems[:10]
+    train_problems, test_problems = split_dataset(problems)
+
     
-    for problem in tqdm(problems, desc="Evaluating"):
+    for problem in tqdm(test_problems, desc="Evaluating"):
         prompt = problem.get('prompt', '')
         test_cases = problem.get('test_cases', [])
         

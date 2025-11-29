@@ -3,7 +3,7 @@
 import json
 from typing import List, Dict, Tuple
 from tqdm import tqdm
-from utils import calculate_test_pass_rate, ErrorType
+from utils import split_dataset, calculate_test_pass_rate, ErrorType
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 import torch
@@ -277,49 +277,6 @@ def load_mbpp(file_path: str = "mbpp.jsonl") -> List[Dict]:
     return problems
 
 
-def split_dataset(
-    problems: List[Dict],
-    train_ratio: float = 0.05,
-    val_ratio: float = 0.2,
-    test_ratio: float = 0.3,
-    seed: int = 42
-) -> Tuple[List[Dict], List[Dict], List[Dict]]:
-    """
-    Split dataset into train/val/test with fixed seed for reproducibility.
-    
-    Args:
-        problems: List of problems
-        train_ratio: Fraction for training (DPO preference generation)
-        val_ratio: Fraction for validation (hyperparameter tuning)
-        test_ratio: Fraction for final evaluation (held-out)
-        seed: Random seed for reproducibility
-    
-    Returns:
-        (train_problems, val_problems, test_problems)
-    """
-    import random
-    random.seed(seed)
-    
-    # Shuffle
-    shuffled = problems.copy()
-    random.shuffle(shuffled)
-    
-    n = len(shuffled)
-    train_end = int(n * train_ratio)
-    val_end = train_end + int(n * val_ratio)
-    
-    train = shuffled[:train_end]
-    val = shuffled[train_end:val_end]
-    test = shuffled[val_end:]
-    
-    print(f"\nDataset split (seed={seed}):")
-    print(f"  Train: {len(train)} problems ({train_ratio*100:.0f}%)")
-    print(f"  Val:   {len(val)} problems ({val_ratio*100:.0f}%)")
-    print(f"  Test:  {len(test)} problems ({test_ratio*100:.0f}%)")
-    
-    return train, val, test
-
-
 if __name__ == "__main__":
     import os
     import argparse
@@ -381,7 +338,7 @@ if __name__ == "__main__":
     if args.train_only or args.dataset == "dummy":
         train_problems = problems
     else:
-        train_problems, val_problems, test_problems = split_dataset(problems)
+        train_problems, test_problems = split_dataset(problems)
     
     # Initialize generator
     generator = PreferenceGenerator()
