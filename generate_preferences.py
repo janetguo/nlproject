@@ -109,7 +109,6 @@ class PreferenceGenerator:
         
         for idx, response_code in enumerate(responses):
             print(f"\n  Response {idx+1}/{len(responses)}:")
-            print(response_code)
             
             # Calculate test pass rate
             pass_rate, error_counts = calculate_test_pass_rate(response_code, test_cases)

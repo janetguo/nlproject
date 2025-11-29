@@ -85,9 +85,7 @@ def generate_code_samples(
             )
         
         generated = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        # Extract only the generated part (after prompt)
-        code = generated[len(prompt):].strip()
-        samples.append(code)
+        samples.append(generated)
     
     return samples
 
@@ -233,11 +231,13 @@ def evaluate_model(
     print("="*60)
     print(f"Total samples: {total_samples}")
     print(f"Compile rate: {compile_count / total_samples:.3f} ({compile_count}/{total_samples})")
+
+    total_tests = sum(total_errors.values())
     
     for error_type in ErrorType:
         count = total_errors[error_type]
         if count > 0:
-            pct = count / total_samples * 100
+            pct = count / total_tests * 100
             print(f"{error_type.value:20s}: {count:5d} ({pct:5.1f}%)")
     
     # Operational metrics

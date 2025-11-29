@@ -9,6 +9,7 @@ from enum import Enum
 import timeout_decorator
 from instrument_test_code import instrument_test_code
 from datasets import load_dataset
+import inspect
 
 
 class ErrorType(Enum):
@@ -111,8 +112,9 @@ def calculate_test_pass_rate(code: str, test_code: str) -> Tuple[float, Dict[str
     # Candidate solution must define the expected entry point
     candidate = None
     for v in candidate_env.values():
-        if callable(v):
+        if inspect.isfunction(v):
             candidate = v
+            break
     if candidate is None:
         return 0.0, {
             ErrorType.RUNTIME_ERROR: 1 
@@ -125,7 +127,12 @@ def calculate_test_pass_rate(code: str, test_code: str) -> Tuple[float, Dict[str
     try:
         check_fn = env["check"]
         check_fn(candidate)
+    except timeout_decorator.TimeoutError:
+        return 0.0, {
+            ErrorType.TIMEOUT: 1
+        }
     except Exception as e:
+        print("EXCEPTION", e)
         # Unexpected crash during tests, not an assertion failure
         # The assertion transformer catches normal assertion failures.
         return 0.0, {
